@@ -4,7 +4,7 @@
 
 (defn average [records]
   (let [sum (->> records
-              (map (comp #(Float/parseFloat %) :revenue))
+              (map :revenue)
               (reduce +))]
     (/ sum (count records))))
 
