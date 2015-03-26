@@ -3,9 +3,8 @@
             [clojure.string :as str]
             [clojure.pprint :as ppr]
             [restaurants.protocols :refer [train predict error]]
-            [restaurants.model.average :as avg]))
-
-(def *output-path* "output.csv")
+            [restaurants.model.average :as avg]
+            [restaurants.utils :refer [rmse]]))
 
 (defn keywordize [s]
   (-> s
@@ -23,19 +22,21 @@
 (defn histogram [records h k]
   (assoc h k (into [] (map k records))))
 
-(defn solution [input model]
-  (spit *output-path* "Id,Prediction\n")
-  (doseq [record (load-csv input 10)]
-    (spit *output-path*
+(defn solution [input output model]
+  (spit output "Id,Prediction\n")
+  (doseq [record (load-csv input)]
+    (spit output
       (str
         (:id record) ","
         (format "%.1f" (predict model record)) "\n")
       :append true)))
 
 (let [records (load-csv "train.csv")
-      hist    (reduce (partial histogram records) {} (keys (first records)))
-      model   (-> (avg/->Average 0)
-                (train records))]
-  (solution "test.csv" model)
+      ;;hist    (reduce (partial histogram records) {} (keys (first records)))
+      model   (-> (avg/->AverageBest nil)
+                (train records))
+      predicts (map (partial predict model) records)]
+  (prn (rmse records predicts))
+  ;;(solution "test.csv" "output.csv" model)
   #_(ppr/pprint (dissoc hist :id) #_(take 1 hist)))
 
