@@ -1,6 +1,6 @@
 (ns restaurants.protocols)
 
 (defprotocol Model
-  (train [train-set])
-  (error [test-set])
-  (predict [item]))
+  (train [this train-set])
+  (error [this test-set])
+  (predict [this item]))
