@@ -66,12 +66,12 @@
 
 (try
   (let [records   (load-csv "train.csv")
-        split-pos (* (count records) 0.8)
+        split-pos (* (count records) 0.9)
         train-set (vec (take split-pos records))
         test-set  (vec (drop split-pos records))
         ;;hist    (reduce (partial histogram records) {} (keys (first records)))
         models  {;;:average (avg/->Average nil)
-                 ;;:average-by-city-group (avg/->AverageBy :city-group nil)
+                 :average-by-city-group (avg/->AverageBy :city-group nil)
                  ;;:average-by-city (avg/->AverageBy :city nil)
                  :average-best (avg/->AverageBest nil)
                  :bagging-avg-best (bag/->Bagging (avg/->AverageBest nil) 50 137)
@@ -82,7 +82,7 @@
                   {}
                   models)
         dataset (incanter.core/to-dataset records)]
-    (doseq [k (keys (first records))]
+    #_(doseq [k (keys (first records))]
       (when (number? (k (first records)))
         (doto
           (charts/scatter-plot k :revenue :data dataset :group-by :city-group)
@@ -91,7 +91,7 @@
       (predict-and-rmse k model test-set)
       (predict-and-rmse k model train-set))
     ;;(order-avg-model-by-rmse records)
-    ;;(solution "test.csv" "output.csv" (:bagging-avg-best trained))
+    (solution "test.csv" "output.csv" (:regression-tree trained))
     ;;(view (charts/bar-chart :city-group :revenue :data dataset :group-by :open-date :legend true))
     ;;(ppr/pprint (first records))
     #_(dt/split-by-attr records :p1)

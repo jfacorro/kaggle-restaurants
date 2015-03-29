@@ -45,11 +45,14 @@
   [records info]
   (let [halves    (group-by (:pred info) records)
         left      (get halves true)
+        nl        (count left)
         right     (get halves false)
+        nr        (count right)
+        n         (count records)
         left-avg  (utils/avg (map :revenue left))
         right-avg (utils/avg (map :revenue right))
-        rmse      (+ (utils/rmse left (repeat left-avg))
-                     (utils/rmse right (repeat right-avg)))]
+        rmse      (+ (* (/ nl n) (utils/rmse left (repeat left-avg)))
+                     (* (/ nr n) (utils/rmse right (repeat right-avg))))]
     (assoc info :rmse rmse :left left :right right)))
 
 (defn split-by-attr
@@ -68,13 +71,24 @@
   (prn (f x))
   x)
 
+(defn rmse [records]
+  (let [avg (utils/avg (map :revenue records))]
+    (utils/rmse records (repeat avg))))
+
 (defn best-split [records]
-  (->> (keys (first records))
-    (filter #(-> % #{:revenue :id :city} not))
-    (map (partial split-by-attr records))
-    (sort-by :rmse)
-    ;;(->>prn (comp :rmse first))
-    first))
+  (let [rmse-all (rmse records)]
+    (->> (keys (first records))
+      (filter #(-> % #{:revenue :id :city} not))
+      (map (partial split-by-attr records))
+      (sort-by :rmse)
+      (filter #(< (:rmse %) rmse-all))
+      first
+      #_(->>prn (fn [{:keys [rmse]}]
+                  (let [avg-all   (utils/avg (map :revenue records))
+                        rmse-all  (utils/rmse records (repeat avg-all))]
+                    (if (< rmse-all rmse)
+                      (prn :WTF!!! rmse-all rmse)
+                      (prn :YEAHH!!!))))))))
 
 (defn split [records]
   (let [{:keys [pred left right attr rmse]} (best-split records)]
@@ -82,11 +96,9 @@
     [pred left right]))
 
 (defn build-node [records]
-  ;;(prn :building (count records))
-  ;;(->> records (take 10) (map :id) prn)
   (if (stop-split? records)
     (do
-      ;;(prn :->leaf (count records))
+      ;(prn (map (juxt :id :p8 :revenue) records ))
       (LeafNode. (utils/avg (map :revenue records))))
     (let [[p l r] (split records)]
       (if p
