@@ -2,14 +2,23 @@
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
             [clojure.pprint :as ppr]
+            [clojure.repl :as repl]
+
+            [incanter.core :refer [view] :as i]
+            [incanter.charts :as charts]
+            incanter.io
+
             [restaurants.protocols :refer [train predict]]
             [restaurants.model.average :as avg]
             [restaurants.model.bagging :as bag]
-            [restaurants.utils :refer [rmse]]))
+            [restaurants.model.decision-trees :as dt]
+            [restaurants.utils :refer [rmse keywordize]]))
 
 (defn parse-date [date]
   (let [fmt (java.text.SimpleDateFormat. "MM/dd/yyyy")]
-  (.parse fmt date)))
+  (->
+    (.parse fmt date)
+    .getMonth)))
 
 (defn convert-value [k v]
   (cond
@@ -19,13 +28,7 @@
     :else (keywordize v)))
 
 (defn process-values [rec]
-  (reduce-kv #(assoc %1 %2 (convert-value %2 %3)) rec rec))
-
-(defn keywordize [s]
-  (-> s
-    str/lower-case
-    (str/replace " " "-")
-    keyword))
+  (reduce-kv #(assoc %1 %2 (convert-value %2 %3)) {} rec))
 
 (defn load-csv [path & [n]]
   (with-open [file (io/reader (io/resource path))]
@@ -55,29 +58,43 @@
     (map (fn [[k ps]] [k (rmse records ps)]))
     (sort-by second)))
 
+(defn predict-and-rmse [k model data-set]
+  (->> data-set
+    (map (partial predict model))
+    (rmse data-set)
+    (prn k :----->)))
+
 (try
-  (let [records (load-csv "train.csv")
+  (let [records   (load-csv "train.csv")
+        split-pos (* (count records) 0.8)
+        train-set (vec (take split-pos records))
+        test-set  (vec (drop split-pos records))
         ;;hist    (reduce (partial histogram records) {} (keys (first records)))
-        models  {:average (avg/->Average nil)
-                 :average-by-city-group (avg/->AverageBy :city-group nil)
-                 :average-by-city (avg/->AverageBy :city nil)
+        models  {;;:average (avg/->Average nil)
+                 ;;:average-by-city-group (avg/->AverageBy :city-group nil)
+                 ;;:average-by-city (avg/->AverageBy :city nil)
                  :average-best (avg/->AverageBest nil)
-                 :bagging-avg-best (bag/->Bagging (avg/->AverageBest nil) 50 1000)}
+                 :bagging-avg-best (bag/->Bagging (avg/->AverageBest nil) 50 137)
+                 :regression-tree (dt/->RegressionTree nil)}
         trained (reduce-kv
                   (fn [trained k model]
-                    (assoc trained k (train model records)))
+                    (assoc trained k (train model train-set)))
                   {}
-                  models)]
+                  models)
+        dataset (incanter.core/to-dataset records)]
+    (doseq [k (keys (first records))]
+      (when (number? (k (first records)))
+        (doto
+          (charts/scatter-plot k :revenue :data dataset :group-by :city-group)
+          (i/save (str (name k) ".png")))))
     (doseq [[k model] trained]
-      (->> records
-        (map (partial predict model))
-        (rmse records)
-        (prn k :----->)))
-    ;;(ppr/pprint (first records))
+      (predict-and-rmse k model test-set)
+      (predict-and-rmse k model train-set))
     ;;(order-avg-model-by-rmse records)
-    ;;(solution "test.csv" "output.csv" model)
-
-    #_(ppr/pprint (dissoc hist :id) #_(take 1 hist)))
+    ;;(solution "test.csv" "output.csv" (:bagging-avg-best trained))
+    ;;(view (charts/bar-chart :city-group :revenue :data dataset :group-by :open-date :legend true))
+    ;;(ppr/pprint (first records))
+    #_(dt/split-by-attr records :p1)
+    )
   (catch Exception ex
-    (clojure.repl/pst ex)))
-
+    (repl/pst ex 50)))

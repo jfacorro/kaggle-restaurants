@@ -32,7 +32,9 @@
   p/Model
   (train [this [rec & _ :as records]]
     (let [f    #(p/train (->AverageBy % nil) records)
-          avgs (map f (keys rec))]
+          ks   (filter (partial not= :revenue) (keys rec))
+          ;;_    (prn ks)
+          avgs (map f ks)]
       (assoc this :avgs avgs)))
   (predict [this item]
     (let [f     (fn [[s c] avg-by]

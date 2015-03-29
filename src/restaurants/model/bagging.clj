@@ -3,10 +3,11 @@
             [restaurants.utils :refer [rmse avg]]))
 
 (defn rand-sample [records n]
-  (reduce (fn [s _]
-            (conj s (get records (rand-int (count records))))) 
-    []
-    (range n)))
+  (let [c (count records)]
+    (loop [s [], i n]
+      (if (pos? i)
+        (recur (conj s (get records (rand-int c))) (dec i))
+        s))))
 
 (defrecord Bagging [model m n]
   p/Model
