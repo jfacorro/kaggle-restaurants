@@ -57,21 +57,43 @@
                       (map #(remove % dataset)))
         cv          (fn [t v]
                       (let [trained (train model t)
-                            predicted (map (partial predict trained) v)]
-                        (rmse v predicted)))
-        result      (map cv training validation)]
-    (utils/avg result)))
+                            v-predicted (map (partial predict trained) v)
+                            t-predicted (map (partial predict trained) v)]
+                        [(rmse v v-predicted)
+                         (rmse t t-predicted)]))
+        result      (map cv training validation)
+        v-rmse      (utils/avg (map first result))
+        t-rmse      (utils/avg (map second result))]
+    [v-rmse
+     t-rmse
+     (/ t-rmse v-rmse)]))
+
+(defn learning-curve [records model & [point-cnt]]
+  (let [n    (count records)
+        k    5
+        max-point-cnt (int (/ n k))
+        step (int (/ n (min (or point-cnt max-point-cnt) max-point-cnt)))
+        data (map (fn [i]
+                    (conj (cross-validation k (take i records) model) i))
+               (range step (+ n step) step))
+        ds   (incanter.core/dataset ["validation" "training" "%" "n"] data)]
+    (doto
+      (charts/xy-plot :n :validation :data ds)
+      (charts/add-lines (map #(get % 3) data) (map #(get % 1) data))
+      view)))
 
 (try
   (let [records (load-csv "train.csv")
+        ;;records (shuffle records)
+        ;;records (take 50 records)
         ;;hist    (reduce (partial histogram records) {} (keys (first records)))
         models  {;;:average (avg/->Average nil)
                  ;;:average-by-city-group (avg/->AverageBy :city-group nil)
                  ;;:average-by-city (avg/->AverageBy :city nil)
-                 :average-best (avg/->AverageBest nil)
+                 ;;:average-best (avg/->AverageBest nil)
                  ;;:bagging-avg-best (bag/->Bagging (avg/->AverageBest nil) 10 137)
-                 ;;:regression-tree (dt/->RegressionTree nil)
-                 :bagging-regression-tree (bag/->Bagging (dt/->RegressionTree nil) 5 137)
+                 :regression-tree (dt/->RegressionTree nil)
+                 ;;:bagging-regression-tree (bag/->Bagging (dt/->RegressionTree nil) 5 137)
                  }
         ;;dataset (incanter.core/to-dataset records)
         ]
@@ -80,9 +102,13 @@
         (doto
           (charts/scatter-plot k :revenue :data dataset :group-by :city-group)
           (i/save (str (name k) ".png")))))
-    (doseq [[k model] models]
+    #_(doseq [[k model] models]
       (prn k
         (cross-validation 10 records model)))
+
+    (doseq [[k model] models]
+      (learning-curve records model))
+
     ;;(solution "test.csv" "output.csv" (:regression-tree trained))
     )
   (catch Exception ex
