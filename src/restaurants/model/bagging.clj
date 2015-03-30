@@ -6,7 +6,9 @@
   (let [c (count records)]
     (loop [s [], i n]
       (if (pos? i)
-        (recur (conj s (get records (rand-int c))) (dec i))
+        (recur
+          (conj s (nth records (rand-int c)))
+          (dec i))
         s))))
 
 (defrecord Bagging [model m n]
@@ -16,5 +18,5 @@
           models  (map (partial p/train model) samples)]
       (assoc this :models models)))
   (predict [this item]
-    (let [predictions (map #(p/predict % item) (:models this))]
+    (let [predictions (mapv #(p/predict % item) (:models this))]
       (avg predictions))))

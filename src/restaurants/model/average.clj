@@ -15,8 +15,8 @@
   (predict [this item] avg))
 
 (defn compute-avg
-  [avgs city-group records]
-  (assoc avgs city-group (average records)))
+  [avgs k records]
+  (assoc avgs k (average records)))
 
 (defrecord AverageBy [field avgs]
   p/Model
@@ -33,7 +33,6 @@
   (train [this [rec & _ :as records]]
     (let [f    #(p/train (->AverageBy % nil) records)
           ks   (filter (partial not= :revenue) (keys rec))
-          ;;_    (prn ks)
           avgs (map f ks)]
       (assoc this :avgs avgs)))
   (predict [this item]

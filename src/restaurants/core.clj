@@ -11,14 +11,12 @@
             [restaurants.protocols :refer [train predict]]
             [restaurants.model.average :as avg]
             [restaurants.model.bagging :as bag]
-            [restaurants.model.decision-trees :as dt]
-            [restaurants.utils :refer [rmse keywordize]]))
+            [restaurants.model.decision-trees :as dt :reload true]
+            [restaurants.utils :refer [rmse keywordize] :as utils]))
 
 (defn parse-date [date]
   (let [fmt (java.text.SimpleDateFormat. "MM/dd/yyyy")]
-  (->
-    (.parse fmt date)
-    .getMonth)))
+    (.getMonth (.parse fmt date))))
 
 (defn convert-value [k v]
   (cond
@@ -51,50 +49,41 @@
         (format "%.1f" (predict model record)) "\n")
       :append true)))
 
-(defn order-avg-model-by-rmse [records]
-  (->> (keys (first records))
-    (map #(let [model (train (avg/->AverageBy % nil) records)]
-           [% (map (partial predict model) records)]))
-    (map (fn [[k ps]] [k (rmse records ps)]))
-    (sort-by second)))
-
-(defn predict-and-rmse [k model data-set]
-  (->> data-set
-    (map (partial predict model))
-    (rmse data-set)
-    (prn k :----->)))
+(defn cross-validation [k dataset model]
+  (let [n           (int (/ (count dataset) k))
+        validation  (partition n dataset)
+        training    (->> validation
+                      (map set)
+                      (map #(remove % dataset)))
+        cv          (fn [t v]
+                      (let [trained (train model t)
+                            predicted (map (partial predict trained) v)]
+                        (rmse v predicted)))
+        result      (map cv training validation)]
+    (utils/avg result)))
 
 (try
-  (let [records   (load-csv "train.csv")
-        split-pos (* (count records) 0.9)
-        train-set (vec (take split-pos records))
-        test-set  (vec (drop split-pos records))
+  (let [records (load-csv "train.csv")
         ;;hist    (reduce (partial histogram records) {} (keys (first records)))
         models  {;;:average (avg/->Average nil)
-                 :average-by-city-group (avg/->AverageBy :city-group nil)
+                 ;;:average-by-city-group (avg/->AverageBy :city-group nil)
                  ;;:average-by-city (avg/->AverageBy :city nil)
                  :average-best (avg/->AverageBest nil)
-                 :bagging-avg-best (bag/->Bagging (avg/->AverageBest nil) 50 137)
-                 :regression-tree (dt/->RegressionTree nil)}
-        trained (reduce-kv
-                  (fn [trained k model]
-                    (assoc trained k (train model train-set)))
-                  {}
-                  models)
-        dataset (incanter.core/to-dataset records)]
+                 ;;:bagging-avg-best (bag/->Bagging (avg/->AverageBest nil) 10 137)
+                 ;;:regression-tree (dt/->RegressionTree nil)
+                 :bagging-regression-tree (bag/->Bagging (dt/->RegressionTree nil) 5 137)
+                 }
+        ;;dataset (incanter.core/to-dataset records)
+        ]
     #_(doseq [k (keys (first records))]
       (when (number? (k (first records)))
         (doto
           (charts/scatter-plot k :revenue :data dataset :group-by :city-group)
           (i/save (str (name k) ".png")))))
-    (doseq [[k model] trained]
-      (predict-and-rmse k model test-set)
-      (predict-and-rmse k model train-set))
-    ;;(order-avg-model-by-rmse records)
-    (solution "test.csv" "output.csv" (:regression-tree trained))
-    ;;(view (charts/bar-chart :city-group :revenue :data dataset :group-by :open-date :legend true))
-    ;;(ppr/pprint (first records))
-    #_(dt/split-by-attr records :p1)
+    (doseq [[k model] models]
+      (prn k
+        (cross-validation 10 records model)))
+    ;;(solution "test.csv" "output.csv" (:regression-tree trained))
     )
   (catch Exception ex
-    (repl/pst ex 50)))
+    (repl/pst ex 20)))
