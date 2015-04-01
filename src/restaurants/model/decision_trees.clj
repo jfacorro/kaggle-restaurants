@@ -30,25 +30,30 @@
     (->> records
       (group-by k)
       (map (fn [[k items]]
-             [k (utils/avg (map :revenue items))]))
+             [k (utils/avg (map p/target items))]))
       (sort-by second)
       (map first)))
 
 (defmethod make-predicate :number [k [_ [r & _]]]
-  #(< (k %) r))
+  (with-meta #(< (k %) r) {:v r}))
 
 (defmethod make-predicate :category [k [l _]]
   (let [s (set l)]
-    #(-> % k s boolean)))
+    (with-meta 
+      #(-> % k s boolean)
+      {:v l})))
 
 (defn stop-split? [records]
-  (<= (count records) 10))
+  (let [avg  (utils/avg (map p/target records))
+        rmse (rmse records)]
+    (< (/ rmse avg) 0.55))
+  #_(<= (count records) 1))
 
 (defn partitions [s]
   (map #(split-at % s) (range 1 (count s))))
 
 (defn rmse [records]
-  (let [avg (utils/avg (map :revenue records))]
+  (let [avg (utils/avg (map p/target records))]
     (utils/rmse records (repeat avg))))
 
 (defn calculate-error
@@ -73,32 +78,30 @@
              (calculate-error records)))
       (sort-by :rmse)
       first)
-    (let [avg (utils/avg (map :revenue records))]
-      {:rmse (utils/rmse records (repeat avg))})))
+    {:rmse (rmse records)}))
 
 (defn best-split [records]
-  (let [rmse-all (rmse records)]
-    (->> (keys (first records))
-      (filter #(-> % #{:revenue :id :city} not))
-      (map (partial split-by-attr records))
-      (sort-by :rmse)
-      first)))
+  (->> (p/attributes (first records))
+    (map (partial split-by-attr records))
+    (sort-by :rmse)
+    first))
 
 (defn split [records]
   (let [{:keys [pred left right attr rmse]} (best-split records)]
-    ;;(prn :split-at attr :left (count left) :right (count right) :rmse rmse)
+    ;;(prn :split-at attr :left (count left) :right (count right) :rmse rmse :pred (-> pred meta :v ))
     [pred left right]))
 
 (defn build-node [records]
   (if (stop-split? records)
-    (LeafNode. (utils/avg (map :revenue records)))
+    (LeafNode. (utils/avg (map p/target records)))
     (let [[p l r] (split records)]
       (if p
         (BranchNode. p (build-node l) (build-node r))
-        (LeafNode. (utils/avg (map :revenue records)))))))
+        (LeafNode. (utils/avg (map p/target records)))))))
 
 (defrecord RegressionTree [root]
   p/Model
+  (description [this] "Regression Tree")
   (train [this records]
     (assoc this :root (build-node records)))
   (predict [this item]
