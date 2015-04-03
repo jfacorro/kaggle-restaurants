@@ -13,6 +13,8 @@
 
 (defrecord Bagging [model m n]
   p/Model
+  (description [this]
+    (str "Bagging for " (p/description model)))
   (train [this records]
     (let [samples (repeatedly m #(rand-sample records n))
           models  (map (partial p/train model) samples)]

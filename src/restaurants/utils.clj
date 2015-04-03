@@ -1,9 +1,10 @@
 (ns restaurants.utils
-  (:require [clojure.string :as str]))
+  (:require [clojure.string :as str]
+            [restaurants.protocols :as p]))
 
 (defn rmse [test-set predictions]
   (->> test-set
-    (map :revenue)
+    (map p/target)
     (map - predictions)
     (map #(* % %))
     (reduce +)

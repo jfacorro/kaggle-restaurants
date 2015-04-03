@@ -94,12 +94,13 @@
   (let [records (load-csv "train.csv")
         ;;records (shuffle records)
         ;;records (take 50 records)
-        models  {:average (avg/->Average nil)
+        models  {;;:average (avg/->Average nil)
                  ;;:average-by-city-group (avg/->AverageBy :city-group nil)
                  ;;:average-by-city (avg/->AverageBy :city nil)
-                 :average-best (avg/->AverageBest nil)
-                 ;;:bagging-avg-best (bag/->Bagging (avg/->AverageBest nil) 10 137)
-                 :regression-tree (dt/->RegressionTree nil)
+                 :average-best-n (avg/->AverageBest nil 13)
+                 ;;:average-by-each (avg/->AverageByEach nil)
+                 ;;:bagging-avg-best (bag/->Bagging (avg/->AverageBest nil 13) 20 200)
+                 ;;:regression-tree (dt/->RegressionTree nil)
                  ;;:bagging-regression-tree (bag/->Bagging (dt/->RegressionTree nil) 5 137)
                  }
         ;;dataset (incanter.core/to-dataset records)
@@ -117,7 +118,7 @@
     #_(doseq [[k model] models]
       (learning-curve records model))
 
-    #_(solution "test.csv" "output.csv" (p/train (dt/->RegressionTree nil) records))
+    ;;(solution "test.csv" "output.csv" (p/train (avg/->AverageBest nil 13) records))
     )
   (catch Exception ex
     (repl/pst ex 20)))
