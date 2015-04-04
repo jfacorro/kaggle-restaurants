@@ -26,7 +26,7 @@
 
 (defn parse-date [date]
   (let [fmt (java.text.SimpleDateFormat. "MM/dd/yyyy")]
-    (-> (.parse fmt date) .getMonth str keyword)))
+    (-> (.parse fmt date) .getTime)))
 
 (defn convert-value [k v]
   (cond
@@ -101,6 +101,7 @@
                  ;;:average-by-each (avg/->AverageByEach nil)
                  ;;:bagging-avg-best (bag/->Bagging (avg/->AverageBest nil 13) 20 200)
                  ;;:regression-tree (dt/->RegressionTree nil)
+                 :random-forest (dt/->RandomForest nil 35 5)
                  ;;:bagging-regression-tree (bag/->Bagging (dt/->RegressionTree nil) 5 137)
                  }
         ;;dataset (incanter.core/to-dataset records)
@@ -118,7 +119,8 @@
     #_(doseq [[k model] models]
       (learning-curve records model))
 
-    ;;(solution "test.csv" "output.csv" (p/train (avg/->AverageBest nil 13) records))
+    #_(let [model (:random-forest models)]
+      (solution "test.csv" "output.csv" (p/train model records)))
     )
   (catch Exception ex
     (repl/pst ex 20)))

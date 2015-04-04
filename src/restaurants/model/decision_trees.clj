@@ -39,20 +39,17 @@
 
 (defmethod make-predicate :category [k [l _]]
   (let [s (set l)]
-    (with-meta 
+    (with-meta
       #(-> % k s boolean)
       {:v l})))
 
 (defn stop-split? [records]
-  (let [avg  (utils/avg (map p/target records))
-        v    (utils/variance records)]
-    (< (/ v avg) 0.55))
-  #_(<= (count records) 1))
+  (<= (count records) 7))
 
 (defn partitions [s]
   (map #(split-at % s) (range 1 (count s))))
 
-(defn calculate-error
+(defn calculate-rmse
   [records info]
   (let [halves    (group-by (:pred info) records)
         left      (get halves true)
@@ -62,7 +59,20 @@
         n         (count records)
         rmse      (+ (* (/ nl n) (utils/rmse left))
                      (* (/ nr n) (utils/rmse right)))]
-    (assoc info :rmse rmse :left left :right right)))
+    (assoc info :error rmse :left left :right right)))
+
+(defn calculate-variance
+  [records info]
+  (let [halves    (group-by (:pred info) records)
+        left      (get halves true)
+        right     (get halves false)
+        nl        (count left)
+        nr        (count right)
+        n         (count records)
+        variance  (- (* n (utils/variance records))
+                     (* nl (utils/variance left))
+                     (* nr (utils/variance right)))]
+    (assoc info :error (/ variance) :left left :right right)))
 
 (defn split-by-attr
   [records k]
@@ -71,34 +81,50 @@
       (map #(->> %
              (make-predicate k)
              (hash-map :attr k :pred)
-             (calculate-error records)))
-      (sort-by :rmse)
+             (calculate-variance records)))
+      (sort-by :error)
       first)
-    {:rmse (utils/rmse records)}))
+    {:error 0 #_(utils/variance records)}))
 
-(defn best-split [records]
-  (->> (p/attributes (first records))
+(defn best-split [records attr-selection]
+  (->> (attr-selection (first records))
     (map (partial split-by-attr records))
-    (sort-by :rmse)
+    (sort-by :error)
     first))
 
-(defn split [records]
-  (let [{:keys [pred left right attr rmse]} (best-split records)]
-    ;;(prn :split-at attr :left (count left) :right (count right) :rmse rmse :pred (-> pred meta :v ))
-    [pred left right]))
-
-(defn build-node [records]
+(defn build-node [records attr-selection]
   (if (stop-split? records)
     (LeafNode. (utils/avg (map p/target records)))
-    (let [[p l r] (split records)]
-      (if p
-        (BranchNode. p (build-node l) (build-node r))
+    (let [{:keys [pred left right] :as split} (best-split records attr-selection)]
+      #_(prn :split-at (:attr split)
+          :left  (count left)
+          :right (count right)
+          :error (:error split)
+          :pred  (-> pred meta :v ))
+      (if pred
+        (BranchNode. pred 
+          (build-node left attr-selection) 
+          (build-node right attr-selection))
         (LeafNode. (utils/avg (map p/target records)))))))
 
 (defrecord RegressionTree [root]
   p/Model
   (description [this] "Regression Tree")
   (train [this records]
-    (assoc this :root (build-node records)))
+    (assoc this :root (build-node records p/attributes)))
   (predict [this item]
     (decide root item)))
+
+
+(defrecord RandomForest [roots n m]
+  p/Model
+  (description [this] "Random Forest")
+  (train [this records]
+    (let [random-attrs
+                (fn [r] (->> (p/attributes r) shuffle (take m)))
+          roots (repeatedly n #(build-node records random-attrs))]
+      (assoc this :roots roots)))
+  (predict [this item]
+    (->> roots
+      (map #(decide % item))
+      utils/avg)))
