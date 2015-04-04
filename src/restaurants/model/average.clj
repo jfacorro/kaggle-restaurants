@@ -1,23 +1,17 @@
 (ns restaurants.model.average
   (:require [restaurants.protocols :as p]
-            [restaurants.utils :refer [rmse]]))
-
-(defn average [records]
-  (let [sum (->> records
-              (map p/target)
-              (reduce +))]
-    (/ sum (count records))))
+            [restaurants.utils :refer [rmse] :as utils]))
 
 (defrecord Average [avg]
   p/Model
   (description [this] "Average")
   (train [this records] 
-    (assoc this :avg (average records)))
+    (assoc this :avg (utils/avg (map p/target records))))
   (predict [this item] avg))
 
 (defn compute-avg
   [avgs k records]
-  (assoc avgs k (average records)))
+  (assoc avgs k (utils/avg (map p/target records))))
 
 (defrecord AverageBy [field avgs]
   p/Model

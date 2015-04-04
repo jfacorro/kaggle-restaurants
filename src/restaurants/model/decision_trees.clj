@@ -45,16 +45,12 @@
 
 (defn stop-split? [records]
   (let [avg  (utils/avg (map p/target records))
-        rmse (rmse records)]
-    (< (/ rmse avg) 0.55))
+        v    (utils/variance records)]
+    (< (/ v avg) 0.55))
   #_(<= (count records) 1))
 
 (defn partitions [s]
   (map #(split-at % s) (range 1 (count s))))
-
-(defn rmse [records]
-  (let [avg (utils/avg (map p/target records))]
-    (utils/rmse records (repeat avg))))
 
 (defn calculate-error
   [records info]
@@ -64,8 +60,8 @@
         nl        (count left)
         nr        (count right)
         n         (count records)
-        rmse      (+ (* (/ nl n) (rmse left))
-                     (* (/ nr n) (rmse right)))]
+        rmse      (+ (* (/ nl n) (utils/rmse left))
+                     (* (/ nr n) (utils/rmse right)))]
     (assoc info :rmse rmse :left left :right right)))
 
 (defn split-by-attr
@@ -78,7 +74,7 @@
              (calculate-error records)))
       (sort-by :rmse)
       first)
-    {:rmse (rmse records)}))
+    {:rmse (utils/rmse records)}))
 
 (defn best-split [records]
   (->> (p/attributes (first records))
