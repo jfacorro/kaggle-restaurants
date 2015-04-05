@@ -100,8 +100,8 @@
                  :average-best-n (avg/->AverageBest nil 13)
                  ;;:average-by-each (avg/->AverageByEach nil)
                  ;;:bagging-avg-best (bag/->Bagging (avg/->AverageBest nil 13) 20 200)
-                 ;;:regression-tree (dt/->RegressionTree nil)
-                 :random-forest (dt/->RandomForest nil 35 5)
+                 :regression-tree (dt/->RegressionTree nil)
+                 ;;:random-forest (dt/->RandomForest nil 35 5)
                  ;;:bagging-regression-tree (bag/->Bagging (dt/->RegressionTree nil) 5 137)
                  }
         ;;dataset (incanter.core/to-dataset records)

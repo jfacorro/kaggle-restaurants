@@ -1,19 +1,7 @@
-;;(remove-ns 'restaurants.model.decision-trees)
 (ns restaurants.model.decision-trees
   (:require [restaurants.protocols :as p]
-            [restaurants.utils :as utils]))
-
-(defprotocol TreeNode
-  (decide [this item]))
-
-(deftype BranchNode [pred right left]
-  TreeNode
-  (decide [this item]
-    (decide (if (pred item) right left) item)))
-
-(deftype LeafNode [value]
-  TreeNode
-  (decide [this item] value))
+            [restaurants.utils :as utils]
+            [restaurants.model.decision-trees.pruning :as prune]))
 
 (defn attr-class [x]
   (if (number? x)
@@ -44,7 +32,7 @@
       {:v l})))
 
 (defn stop-split? [records]
-  (<= (count records) 7))
+  (= (count records) 2))
 
 (defn partitions [s]
   (map #(split-at % s) (range 1 (count s))))
@@ -86,43 +74,47 @@
       first)
     {:error 0 #_(utils/variance records)}))
 
-(defn best-split [records attr-selection]
-  (->> (attr-selection (first records))
+(defn best-split [[rec :as records] attr-sel]
+  (->> (attr-sel rec)
     (map (partial split-by-attr records))
     (sort-by :error)
     first))
 
-(defn build-node [records attr-selection]
+(defn- prn-split-info [{:keys [attr left right pred error]}]
+  (prn :split-at attr
+    :left  (count left)
+    :right (count right)
+    :error error
+    :pred  (-> pred meta :v )))
+
+(defn build-node [records attr-sel]
   (if (stop-split? records)
     (LeafNode. (utils/avg (map p/target records)))
-    (let [{:keys [pred left right] :as split} (best-split records attr-selection)]
-      #_(prn :split-at (:attr split)
-          :left  (count left)
-          :right (count right)
-          :error (:error split)
-          :pred  (-> pred meta :v ))
+    (let [{:keys [pred left right] :as split} (best-split records attr-sel)]
+      #_(prn-split-info split)
       (if pred
         (BranchNode. pred 
-          (build-node left attr-selection) 
-          (build-node right attr-selection))
+          (build-node left attr-sel)
+          (build-node right attr-sel)
+          records)
         (LeafNode. (utils/avg (map p/target records)))))))
 
 (defrecord RegressionTree [root]
   p/Model
   (description [this] "Regression Tree")
-  (train [this records]
-    (assoc this :root (build-node records p/attributes)))
+  (train [this train-set]
+    (let [root (build-node train-set p/attributes)]
+      (assoc this :root (prune/prune root 0 (count train-set)))))
   (predict [this item]
     (decide root item)))
-
 
 (defrecord RandomForest [roots n m]
   p/Model
   (description [this] "Random Forest")
   (train [this records]
-    (let [random-attrs
-                (fn [r] (->> (p/attributes r) shuffle (take m)))
-          roots (repeatedly n #(build-node records random-attrs))]
+    (let [rand-attrs #(->> (p/attributes %) shuffle (take m))
+          f          #(build-node records rand-attrs)
+          roots      (apply pcalls (repeat n f))]
       (assoc this :roots roots)))
   (predict [this item]
     (->> roots
