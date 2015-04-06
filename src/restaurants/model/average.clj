@@ -5,7 +5,9 @@
 (defrecord Average [avg]
   p/Model
   (description [this] "Average")
-  (train [this records] 
+  (train [this records]
+    (p/train this records nil))
+  (train [this records _]
     (assoc this :avg (utils/avg (map p/target records))))
   (predict [this item] avg))
 
@@ -17,6 +19,8 @@
   p/Model
   (description [this] (str "Average By " field))
   (train [this records]
+    (p/train this records nil))
+  (train [this records _]
     (let [avgs (->> records 
                  (group-by field)
                  (reduce-kv compute-avg {}))]
@@ -28,7 +32,9 @@
 (defrecord AverageByEach [models]
   p/Model
   (description [this] (str "Average By Avg. of Each Field"))
-  (train [this [rec & _ :as records]]
+  (train [this records]
+    (p/train this records nil))
+  (train [this [rec & _ :as records] _]
     (let [f      #(p/train (->AverageBy % nil) records)
           models (map f (p/attributes rec))]
       (assoc this :models models)))
@@ -43,7 +49,9 @@
 (defrecord AverageBest [models n]
   p/Model
   (description [this] (str "Average the Best " n " Fields"))
-  (train [this [rec & _ :as records]]
+  (train [this records]
+    (p/train this records nil))
+  (train [this [rec & _ :as records] _]
     (let [f      #(p/train (->AverageBy % nil) records)
           models (map f (p/attributes rec))
           rmse   (fn [model]

@@ -1,7 +1,9 @@
 (ns restaurants.model.decision-trees
   (:require [restaurants.protocols :as p]
             [restaurants.utils :as utils]
-            [restaurants.model.decision-trees.pruning :as prune]))
+            [restaurants.model.decision-trees.pruning :as prune]
+            [restaurants.model.decision-trees.protocols :refer [leaf? decide]])
+  (:import  [restaurants.model.decision_trees.protocols BranchNode LeafNode]))
 
 (defn attr-class [x]
   (if (number? x)
@@ -32,7 +34,7 @@
       {:v l})))
 
 (defn stop-split? [records]
-  (= (count records) 2))
+  (= (count records) 1))
 
 (defn partitions [s]
   (map #(split-at % s) (range 1 (count s))))
@@ -103,17 +105,25 @@
   p/Model
   (description [this] "Regression Tree")
   (train [this train-set]
-    (let [root (build-node train-set p/attributes)]
-      (assoc this :root (prune/prune root 0 (count train-set)))))
+    (p/train this train-set nil))
+  (train [this train-set validation-set]
+    (let [root (build-node train-set p/attributes)
+          root (if (seq validation-set) (prune/prune root validation-set) root)]
+      (assoc this :root root)))
   (predict [this item]
     (decide root item)))
 
 (defrecord RandomForest [roots n m]
   p/Model
   (description [this] "Random Forest")
-  (train [this records]
+  (train [this train-set]
+    (p/train this train-set nil))
+  (train [this train-set validation-set]
     (let [rand-attrs #(->> (p/attributes %) shuffle (take m))
-          f          #(build-node records rand-attrs)
+          f          #(let [root (build-node train-set rand-attrs)]
+                       (if (seq validation-set)
+                         (prune/prune root validation-set)
+                         root))
           roots      (apply pcalls (repeat n f))]
       (assoc this :roots roots)))
   (predict [this item]

@@ -64,7 +64,7 @@
                       (map set)
                       (map #(remove % dataset)))
         cv          (fn [t v]
-                      (let [trained (train model t)
+                      (let [trained (train model t v)
                             v-predicted (map (partial predict trained) v)
                             t-predicted (map (partial predict trained) v)]
                         [(rmse v v-predicted)
@@ -111,6 +111,7 @@
         (doto
           (charts/scatter-plot k :revenue :data dataset :group-by :city-group)
           (i/save (str (name k) ".png")))))
+
     (doseq [[k model] models]
       (println
         (p/description model) "=>"
@@ -119,8 +120,11 @@
     #_(doseq [[k model] models]
       (learning-curve records model))
 
-    #_(let [model (:random-forest models)]
-      (solution "test.csv" "output.csv" (p/train model records)))
+    #_(let [model     (:random-forest models)
+          records   (shuffle records)
+          train-set (take 110 records)
+          validation-set (drop 110 records)]
+      (solution "test.csv" "output.csv" (p/train model train-set validation-set)))
     )
   (catch Exception ex
     (repl/pst ex 20)))
