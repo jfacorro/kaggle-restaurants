@@ -1,6 +1,7 @@
 (ns restaurants.model.decision-trees
   (:require [restaurants.protocols :as p]
             [restaurants.utils :as utils]
+            [restaurants.model.average :as avg]
             [restaurants.model.decision-trees.pruning :as prune]
             [restaurants.model.decision-trees.protocols :refer [leaf? decide]])
   (:import  [restaurants.model.decision_trees.protocols BranchNode LeafNode]))
@@ -34,7 +35,7 @@
       {:v l})))
 
 (defn stop-split? [records]
-  (= (count records) 1))
+  (<= (count records) 7))
 
 (defn partitions [s]
   (map #(split-at % s) (range 1 (count s))))
@@ -59,26 +60,26 @@
         nl        (count left)
         nr        (count right)
         n         (count records)
-        variance  (- (* n (utils/variance records))
+        variance  (+ (- (* n (utils/variance records)))
                      (* nl (utils/variance left))
                      (* nr (utils/variance right)))]
-    (assoc info :error (/ variance) :left left :right right)))
+    (assoc info :error variance :left left :right right)))
 
 (defn split-by-attr
   [records k]
-  (if-let [parts (->> records (map k) set (sort-values records k) partitions seq)]
+  (when-let [parts (->> records (map k) set (sort-values records k) partitions seq)]
     (->> parts
       (map #(->> %
              (make-predicate k)
              (hash-map :attr k :pred)
              (calculate-variance records)))
       (sort-by :error)
-      first)
-    {:error 0 #_(utils/variance records)}))
+      first)))
 
 (defn best-split [[rec :as records] attr-sel]
   (->> (attr-sel rec)
     (map (partial split-by-attr records))
+    (filter identity)
     (sort-by :error)
     first))
 
@@ -93,13 +94,17 @@
   (if (stop-split? records)
     (LeafNode. (utils/avg (map p/target records)))
     (let [{:keys [pred left right] :as split} (best-split records attr-sel)]
-      #_(prn-split-info split)
+      ;;(prn-split-info split)
       (if pred
-        (BranchNode. pred 
-          (build-node left attr-sel)
-          (build-node right attr-sel)
-          records)
+        (let [[left right] (map #(build-node % attr-sel) [left right])]
+          (BranchNode. pred left right records))
         (LeafNode. (utils/avg (map p/target records)))))))
+
+(defn best-attrs [ds n]
+  (->> ds
+    (p/train (avg/->AverageBest nil n))
+    :models
+    (map :field)))
 
 (defrecord RegressionTree [root]
   p/Model
@@ -107,7 +112,9 @@
   (train [this train-set]
     (p/train this train-set nil))
   (train [this train-set validation-set]
-    (let [root (build-node train-set p/attributes)
+    (let [attrs    (best-attrs train-set 13)
+          attr-sel #(do % attrs)
+          root (build-node train-set attr-sel)
           root (if (seq validation-set) (prune/prune root validation-set) root)]
       (assoc this :root root)))
   (predict [this item]
@@ -119,12 +126,14 @@
   (train [this train-set]
     (p/train this train-set nil))
   (train [this train-set validation-set]
-    (let [rand-attrs #(->> (p/attributes %) shuffle (take m))
+    (let [attrs      (best-attrs train-set 15)
+          rand-attrs #(do % (->> attrs shuffle (take m)))
           f          #(let [root (build-node train-set rand-attrs)]
                        (if (seq validation-set)
                          (prune/prune root validation-set)
                          root))
           roots      (apply pcalls (repeat n f))]
+      (prn :roots (frequencies (map leaf? roots)))
       (assoc this :roots roots)))
   (predict [this item]
     (->> roots

@@ -70,3 +70,12 @@
                     [s c]))
           [s c] (reduce f [0.0 0] models)]
       (/ s c))))
+
+(defrecord AverageModels [models]
+  p/Model
+  (description [_]
+    (str "Average of models" (map p/description models)))
+  (train [this _] this)
+  (train [this _ _] this)
+  (predict [this item]
+    (utils/avg (map #(p/predict % item) models))))

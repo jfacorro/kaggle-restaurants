@@ -11,7 +11,7 @@
           prediction (utils/avg (map p/target samples))
           rmse-node  (utils/rmse validation (repeat prediction))
           rmse-st    (utils/rmse validation (map (partial decide node) validation))]
-      (<= rmse-node rmse-st))))
+      (< rmse-node rmse-st))))
 
 (defn prune [node validation-set]
   (if (leaf? node)
@@ -22,7 +22,5 @@
           samples  (.samples node)
           new-node (BranchNode. pred left right samples)]
       (if (prune? new-node validation-set)
-        (do
-          #_(prn :pruned!)
-          (LeafNode. (utils/avg (map p/target samples))))
+        (LeafNode. (utils/avg (map p/target samples)))
         new-node))))

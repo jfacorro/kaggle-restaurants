@@ -15,9 +15,11 @@
   p/Model
   (description [this]
     (str "Bagging for " (p/description model)))
-  (train [this records]
-    (let [samples (repeatedly m #(rand-sample records n))
-          models  (map (partial p/train model) samples)]
+  (train [this train-set]
+    (p/train this train-set nil))
+  (train [this train-set validation-set]
+    (let [samples (repeatedly m #(rand-sample train-set n))
+          models  (pmap #(p/train model % validation-set) samples)]
       (assoc this :models models)))
   (predict [this item]
     (let [predictions (mapv #(p/predict % item) (:models this))]

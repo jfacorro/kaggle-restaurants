@@ -20,12 +20,12 @@
 
 (defn variance
   [records]
-  (->> records
-    (map p/target)
-    (map - (->> records (map p/target) avg repeat))
-    (map #(* % %))
-    (reduce +)
-    (* (/ (count records)))))
+  (let [targets (map p/target records)]
+    (->> targets
+      (map - (->> targets avg repeat))
+      (map #(* % %))
+      (reduce +)
+      (* (/ (count records))))))
 
 (defn keywordize [s]
   (-> s

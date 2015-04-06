@@ -66,15 +66,18 @@
         cv          (fn [t v]
                       (let [trained (train model t v)
                             v-predicted (map (partial predict trained) v)
-                            t-predicted (map (partial predict trained) v)]
-                        [(rmse v v-predicted)
-                         (rmse t t-predicted)]))
+                            t-predicted (map (partial predict trained) v)
+                            rmse-v      (rmse v v-predicted)
+                            rmse-t      (rmse t t-predicted)]
+                        ;;(prn :rmse-v rmse-v :rmse-t rmse-t (/ rmse-v rmse-t))
+                        [rmse-v rmse-t trained]))
         result      (map cv training validation)
         v-rmse      (utils/avg (map first result))
-        t-rmse      (utils/avg (map second result))]
+        t-rmse      (utils/avg (map second result))
+        models      (map last result)]
     [v-rmse
      t-rmse
-     (/ t-rmse v-rmse)]))
+     (/ t-rmse v-rmse) models]))
 
 (defn learning-curve [records model & [point-cnt]]
   (let [n    (count records)
@@ -100,9 +103,9 @@
                  :average-best-n (avg/->AverageBest nil 13)
                  ;;:average-by-each (avg/->AverageByEach nil)
                  ;;:bagging-avg-best (bag/->Bagging (avg/->AverageBest nil 13) 20 200)
-                 :regression-tree (dt/->RegressionTree nil)
-                 ;;:random-forest (dt/->RandomForest nil 35 5)
-                 ;;:bagging-regression-tree (bag/->Bagging (dt/->RegressionTree nil) 5 137)
+                 ;;:regression-tree (dt/->RegressionTree nil)
+                 ;;:bagging-regression-tree (bag/->Bagging (dt/->RegressionTree nil) 10 1000)
+                 :random-forest (dt/->RandomForest nil 35 5)
                  }
         ;;dataset (incanter.core/to-dataset records)
         ]
@@ -113,18 +116,21 @@
           (i/save (str (name k) ".png")))))
 
     (doseq [[k model] models]
-      (println
-        (p/description model) "=>"
-        (cross-validation 5 records model)))
+      (let [[val-error train-err factor cv-models]
+                  (cross-validation 5 records model)]
+        (println "Cross Validating:"
+          (p/description model)
+          "=>"
+          val-error "," train-err "," factor)
+        (if (= k :random-forest)
+          (solution "test.csv" "output.csv" (avg/->AverageModels cv-models)))))
 
     #_(doseq [[k model] models]
       (learning-curve records model))
 
-    #_(let [model     (:random-forest models)
-          records   (shuffle records)
-          train-set (take 110 records)
-          validation-set (drop 110 records)]
-      (solution "test.csv" "output.csv" (p/train model train-set validation-set)))
+    #_(let [model (:regression-tree models)]
+      (p/train model records)
+      (prn (utils/rmse records)))
     )
   (catch Exception ex
     (repl/pst ex 20)))
