@@ -35,7 +35,7 @@
       {:v l})))
 
 (defn stop-split? [records]
-  (<= (count records) 7))
+  (<= (count records) 1))
 
 (defn partitions [s]
   (map #(split-at % s) (range 1 (count s))))
