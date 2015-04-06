@@ -132,7 +132,8 @@
                        (if (seq validation-set)
                          (prune/prune root validation-set)
                          root))
-          roots      (apply pcalls (repeat n f))]
+          roots      (apply pcalls (repeat n f))
+          roots      (filter (comp not leaf?) roots)]
       (prn :roots (frequencies (map leaf? roots)))
       (assoc this :roots roots)))
   (predict [this item]

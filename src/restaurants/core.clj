@@ -68,13 +68,17 @@
                             v-predicted (map (partial predict trained) v)
                             t-predicted (map (partial predict trained) v)
                             rmse-v      (rmse v v-predicted)
-                            rmse-t      (rmse t t-predicted)]
-                        ;;(prn :rmse-v rmse-v :rmse-t rmse-t (/ rmse-v rmse-t))
-                        [rmse-v rmse-t trained]))
+                            rmse-t      (rmse t t-predicted)
+                            ratio       (/ rmse-v rmse-t)]
+                        (prn :rmse-v rmse-v :rmse-t rmse-t :ratio ratio)
+                        {:rmse-v rmse-v :rmse-t rmse-t :ratio ratio :model trained}))
         result      (map cv training validation)
-        v-rmse      (utils/avg (map first result))
-        t-rmse      (utils/avg (map second result))
-        models      (map last result)]
+        result      (->> result
+                      (sort-by :ratio)
+                      (take 3))
+        v-rmse      (utils/avg (map :rmse-v result))
+        t-rmse      (utils/avg (map :rmse-t result))
+        models      (map :model result)]
     [v-rmse
      t-rmse
      (/ t-rmse v-rmse) models]))
@@ -122,7 +126,7 @@
           (p/description model)
           "=>"
           val-error "," train-err "," factor)
-        (if (= k :random-forest)
+        #_(if (= k :random-forest)
           (solution "test.csv" "output.csv" (avg/->AverageModels cv-models)))))
 
     #_(doseq [[k model] models]
