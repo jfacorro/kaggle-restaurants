@@ -25,11 +25,16 @@ load_data <- function() {
 main <- function() {
   ignore_fields <- c(-1, -3)
   
-  svm.model <- svm(revenue ~ ., data = train[, ignore_fields], cost = 100, gamma = 0.0001)
+  svm.model <- svm(revenue ~ ., data = train[, ignore_fields], 
+                   cost = 10,
+                   gamma = 0.001,
+                   fitted = TRUE,
+                   type = "eps-regression", 
+                   kernel = "radial")
   cvFit(svm.model, data = train, y = train$revenue, K = 5, R = 10)
   # svm.preds <- predict(svm.model, newdata = test[, ignore_fields])
   
-  rpart.model <- rpart(revenue ~ ., data = train[, ignore_fields], control = rpart.control(cp = 0.01, minsplit = 2))
+  rpart.model <- rpart(revenue ~ ., data = train[, ignore_fields], control = rpart.control(cp = 0.05, minsplit = 35))
   cvFit(rpart.model, data = train, y = train$revenue, K = 5, R = 10)
   # rpart.preds <- predict(rpart.model, test[, ignore_fields])
   
